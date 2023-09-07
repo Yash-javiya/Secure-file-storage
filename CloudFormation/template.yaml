@@ -1,0 +1,346 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Globals:
+  Function:
+    Runtime: python3.10
+    Timeout: 10
+Resources:
+  HttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      Name: HttpApi
+      CorsConfiguration:
+        AllowMethods:
+        - '*'
+        AllowOrigins:
+        - '*'
+        AllowHeaders:
+        - '*'
+      Auth:
+        Authorizers:
+          LambdaAuthorizer:
+            AuthorizerPayloadFormatVersion: 2.0
+            EnableSimpleResponses: true
+            FunctionArn:
+              Fn::GetAtt:
+              - AuthorizerFunction
+              - Arn
+            FunctionInvokeRole: arn:aws:iam::407226150316:role/LabRole
+            Identity:
+              Headers:
+              - Authorization
+  AuthorizerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: AuthorizerFunction
+      Handler: index.handler
+      CodeUri: s3://sam-deploy-bucket-5409-prod/4afaab065ce1b7feb001329feb442fc3
+      Role: arn:aws:iam::407226150316:role/LabRole
+      Layers:
+      - Ref: AuthorizerLayer
+      Environment:
+        Variables:
+          JWT_SECRET_NAME: jwt_secret
+          USER_TABLE_NAME:
+            Ref: DynamoDBTable
+  LoginFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: LoginFunction
+      Handler: index.handler
+      CodeUri: s3://sam-deploy-bucket-5409-prod/fcdf01966bc763f4fde0c60a34cb82ab
+      Role: arn:aws:iam::407226150316:role/LabRole
+      Events:
+        LoginEvent:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: HttpApi
+            Path: /login
+            Method: POST
+      Layers:
+      - Ref: LoginRegisterLayer
+      - Ref: CipherLayer
+      Environment:
+        Variables:
+          USER_TABLE_NAME:
+            Ref: DynamoDBTable
+          JWT_SECRET_NAME: jwt_secret
+  RegisterFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: RegisterFunction
+      Handler: index.handler
+      CodeUri: s3://sam-deploy-bucket-5409-prod/f6c75b73da59e6eecf915a99a8071087
+      Role: arn:aws:iam::407226150316:role/LabRole
+      Events:
+        RegisterEvent:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: HttpApi
+            Path: /register
+            Method: POST
+      Layers:
+      - Ref: LoginRegisterLayer
+      - Ref: CipherLayer
+      Environment:
+        Variables:
+          USER_TABLE_NAME:
+            Ref: DynamoDBTable
+          LAMBDA_FUNCTION_NAME: GenKeyFunction
+  GenKeyFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: GenKeyFunction
+      Handler: index.handler
+      CodeUri: s3://sam-deploy-bucket-5409-prod/6ba5e4c49255f3988e055b3f3958854d
+      Role: arn:aws:iam::407226150316:role/LabRole
+      Layers:
+      - Ref: LoginRegisterLayer
+      - Ref: CipherLayer
+      Environment:
+        Variables:
+          USER_TABLE_NAME:
+            Ref: DynamoDBTable
+          LAB_ROLE_NAME: LabRole
+  GetKeyFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: GetKeyFunction
+      Handler: index.handler
+      CodeUri: s3://sam-deploy-bucket-5409-prod/68c01507536050a8246005d8a2ea3318
+      Role: arn:aws:iam::407226150316:role/LabRole
+      Events:
+        GetKeyEvent:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: HttpApi
+            Path: /getkey
+            Method: GET
+            Auth:
+              Authorizer: LambdaAuthorizer
+      Layers:
+      - Ref: LoginRegisterLayer
+      - Ref: CipherLayer
+      Environment:
+        Variables:
+          LAMBDA_FUNCTION_NAME: GenKeyFunction
+  FileGetFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: FileGetFunction
+      Handler: index.handler
+      CodeUri: s3://sam-deploy-bucket-5409-prod/93ad57f4f5575f2a0c6df93c00bd85a7
+      Role: arn:aws:iam::407226150316:role/LabRole
+      Events:
+        FileGetEvent:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: HttpApi
+            Path: /fileget
+            Method: POST
+            Auth:
+              Authorizer: LambdaAuthorizer
+      Layers:
+      - Ref: LoginRegisterLayer
+      - Ref: CipherLayer
+      Environment:
+        Variables:
+          S3_BUCKET_NAME:
+            Ref: S3
+  FileUpFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: FileUpFunction
+      Handler: index.handler
+      CodeUri: s3://sam-deploy-bucket-5409-prod/9a626afa74138cb7ca7f6b5dec5445a2
+      Role: arn:aws:iam::407226150316:role/LabRole
+      Events:
+        FileUpEvent:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: HttpApi
+            Path: /fileup
+            Method: POST
+            Auth:
+              Authorizer: LambdaAuthorizer
+      Layers:
+      - Ref: LoginRegisterLayer
+      - Ref: CipherLayer
+      Environment:
+        Variables:
+          S3_MASTER_KEY_SECRET_NAME: s3-master-key
+          S3_BUCKET_NAME:
+            Ref: S3
+  FileDownFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: FileDownFunction
+      Handler: index.handler
+      CodeUri: s3://sam-deploy-bucket-5409-prod/762f6500ff32cc1ed61988f4f28cc1ce
+      Role: arn:aws:iam::407226150316:role/LabRole
+      Events:
+        FileDownEvent:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: HttpApi
+            Path: /filedown
+            Method: POST
+            Auth:
+              Authorizer: LambdaAuthorizer
+      Layers:
+      - Ref: LoginRegisterLayer
+      - Ref: CipherLayer
+      Environment:
+        Variables:
+          S3_MASTER_KEY_SECRET_NAME: s3-master-key
+          S3_BUCKET_NAME:
+            Ref: S3
+  FileDelFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: FileDelFunction
+      Handler: index.handler
+      CodeUri: s3://sam-deploy-bucket-5409-prod/564e141acd1112381831c692e58a0f31
+      Role: arn:aws:iam::407226150316:role/LabRole
+      Events:
+        FileDelEvent:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: HttpApi
+            Path: /filedel
+            Method: POST
+            Auth:
+              Authorizer: LambdaAuthorizer
+      Layers:
+      - Ref: LoginRegisterLayer
+      - Ref: CipherLayer
+      Environment:
+        Variables:
+          S3_BUCKET_NAME:
+            Ref: S3
+  AuthorizerLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: AuthorizerLayer
+      ContentUri: s3://sam-deploy-bucket-5409-prod/a1cda2e3268e591ba18cf5bea582dcfe
+      CompatibleRuntimes:
+      - python3.10
+  LoginRegisterLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: LoginRegisterLayer
+      ContentUri: s3://sam-deploy-bucket-5409-prod/e1dfe08307c1c173799ffa28652b148d
+      CompatibleRuntimes:
+      - python3.10
+  CipherLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: CipherLayer
+      ContentUri: s3://sam-deploy-bucket-5409-prod/ce39875279fac575da45b7445910e0ce
+      CompatibleRuntimes:
+      - python3.10
+  AuthorizerPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName:
+        Fn::GetAtt:
+        - AuthorizerFunction
+        - Arn
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Sub: arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*/*/*
+  S3Secret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: s3-master-key
+      SecretString: '{"S3_master_key":"70a60dfd85bbdd5280dc5ecadd4a62617d5ab259ba985e263c36d3f8b1d450a0"}'
+  JWTSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: jwt_secret
+      SecretString: '{"jwt_secret":"a0390418f8bbd49be9ba521a3cbd11aa"}'
+  DynamoDBTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: userTable
+      AttributeDefinitions:
+      - AttributeName: username
+        AttributeType: S
+      KeySchema:
+      - AttributeName: username
+        KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+  S3:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: project-5409-s3-bucket
+  SecureStore:
+    Type: AWS::ElasticBeanstalk::Application
+    Properties:
+      ApplicationName: SecureStore
+      Description: AWS Elastic Beanstalk React Frontend Application for User Authentication
+  SecureStoreVersion:
+    Type: AWS::ElasticBeanstalk::ApplicationVersion
+    Properties:
+      ApplicationName:
+        Ref: SecureStore
+      Description: My application version
+      SourceBundle:
+        S3Bucket: sam-deploy-bucket-5409-prod
+        S3Key: ElasticBeanstalkFrontend/SecureStore.zip
+  SecureStoreConfigurationTemplate:
+    Type: AWS::ElasticBeanstalk::ConfigurationTemplate
+    Properties:
+      ApplicationName:
+        Ref: SecureStore
+      Description: My application configuration template
+      SolutionStackName: 64bit Amazon Linux 2 v5.8.4 running Node.js 18
+      OptionSettings:
+      - Namespace: aws:autoscaling:launchconfiguration
+        OptionName: InstanceType
+        Value: t3.small
+      - Namespace: aws:autoscaling:launchconfiguration
+        OptionName: EC2KeyName
+        Value: vockey
+      - Namespace: aws:autoscaling:launchconfiguration
+        OptionName: IamInstanceProfile
+        Value: LabInstanceProfile
+      - Namespace: aws:elasticbeanstalk:environment
+        OptionName: ServiceRole
+        Value: arn:aws:iam::407226150316:role/LabRole
+      - Namespace: aws:elasticbeanstalk:environment
+        OptionName: EnvironmentType
+        Value: SingleInstance
+      - Namespace: aws:elasticbeanstalk:application:environment
+        OptionName: REACT_APP_API_BASE_URL
+        Value:
+          Fn::Sub: https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com
+  SecureStoreEnvironment:
+    Type: AWS::ElasticBeanstalk::Environment
+    Properties:
+      ApplicationName:
+        Ref: SecureStore
+      EnvironmentName: SecureStoreEnvironment
+      TemplateName:
+        Ref: SecureStoreConfigurationTemplate
+      VersionLabel:
+        Ref: SecureStoreVersion
+Outputs:
+  APIGatewayURL:
+    Description: URL of the API Gateway
+    Value:
+      Fn::Sub: https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com
+  ElasticBeanstalkURL:
+    Description: URL of the Elastic Beanstalk Environment
+    Value:
+      Fn::GetAtt:
+      - SecureStoreEnvironment
+      - EndpointURL

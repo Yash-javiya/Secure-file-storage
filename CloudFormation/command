@@ -1,0 +1,3 @@
+aws s3 cp SecureStore.zip s3://sam-deploy-bucket-5409-prod/ElasticBeanstalkFrontend/SecureStore.zip
+aws cloudformation package --template-file demo.yaml --s3-bucket sam-deploy-bucket-5409-prod --output-template-file template.yaml
+aws cloudformation deploy --template-file C:\Users\yashj\OneDrive\Desktop\Project\cloud-formation\backend\template.yaml --stack-name project
